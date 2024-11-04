@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QCM Dynamique avec JSON</title>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+            color: #333;
+            padding-top: 70px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            color: #4CAF50;
+        }
+
+        form {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+
+        label {
+            font-weight: bold;
+            color: #333;
+        }
+
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        .toggle-button.active {
+            background-color: #007bff;
+            color: white;
+        }
+
+        .correct-answer {
+            color: green;
+            font-weight: bold;
+        }
+
+        .incorrect-answer {
+            color: red;
+            font-weight: bold;
+        }
+
+        .correct {
+            background-color: #d4edda;
+        }
+
+        .incorrect {
+            background-color: #f8d7da;
+        }
+
+        .dark-mode {
+            background-color: #333;
+            color: #f5f5f5;
+            transition: background-color 0.5s, color 0.5s;
+        }
+
+        .dark-mode form {
+            background-color: #444;
+            color: #f5f5f5;
+            transition: background-color 0.5s, color 0.5s;
+        }
+
+        .dark-mode button {
+            background-color: #555;
+        }
+
+        .dark-mode button:hover {
+            background-color: #666;
+        }
+
+        .dark-mode h1 {
+            color: #90ee90;
+        }
+
+        .dark-mode label {
+            color: #f5f5f5;
+        }
+
+        .dark-mode .incorrect {
+            background-color: #843838;
+        }
+
+        .dark-mode .correct {
+            background-color: #4c724c;
+        }
+
+        #progressBarContainer {
+            width: 100%;
+            background-color: #ccc;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            overflow: hidden;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+
+        #progressBar {
+            width: 0;
+            height: 20px;
+            background-color: #4CAF50;
+            text-align: center;
+            line-height: 20px;
+            color: white;
+            transition: width 0.5s ease-in-out;
+        }
+
+        #scoreContainer {
+            text-align: center;
+        }
+
+        /* Amélioration de la Mise en Page Mobile */
+        @media (max-width: 768px) {
+            body {
+                margin: 10px;
+                padding-top: 50px;
+            }
+
+            form {
+                padding: 15px;
+            }
+
+            button {
+                font-size: 14px;
+                padding: 8px 16px;
+            }
+
+            h1 {
+                font-size: 24px;
+            }
+
+            label {
+                font-size: 14px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <h1>QCM Dynamique avec JSON</h1>
+        <p>Répondez aux questions suivantes en sélectionnant la bonne réponse.</p>
+        <label for="themeToggle">Mode sombre :</label>
+        <input type="checkbox" id="themeToggle" onchange="toggleTheme()">
+        <br><br>
+        <label for="fileInput">Importer un fichier JSON :</label>
+        <input type="file" id="fileInput" accept=".json" onchange="importQuestions()">
+        <br><br>
+        <button id="shuffleButton" class="toggle-button" onclick="toggleShuffle()">Mélanger les questions</button>
+        <br><br>
+        <button onclick="goToJsonCreatorPage()">Aller à la création du QCM</button>
+    </header>
+    <div id="progressBarContainer">
+        <div id="progressBar">0%</div>
+    </div>
+    <form id="qcmForm">
+        <!-- Les questions seront insérées ici dynamiquement -->
+    </form>
+    <div id="resultat"></div>
+    <div id="scoreContainer" class="scoreContainer">
+        <h2 id="scoreText"></h2>
+        <h3 id="noteText"></h3>
+    </div>
+    <label for="correctionType">Choisissez le type de correction :</label>
+    <select id="correctionType">
+        <option value="color">Changer la couleur de la question</option>
+        <option value="highlight">Changer la couleur de l'ensemble</option>
+    </select>
+    <br><br>
+    <label for="lockAnswers">Verrouiller les réponses après soumission :</label>
+    <input type="checkbox" id="lockAnswers" checked>
+
+    <script>
+        let shuffleQuestions = false;
+        let qcmStarted = false;
+        let questionsState = []; // Pour sauvegarder l'état des réponses
+
+        // Charger les questions depuis le stockage local
+        document.addEventListener('DOMContentLoaded', function () {
+            const questionsJSON = localStorage.getItem('qcmQuestions');
+            const questionsStateJSON = localStorage.getItem('qcmQuestionsState');
+            if (questionsJSON) {
+                try {
+                    const questions = JSON.parse(questionsJSON);
+                    if (questionsStateJSON) {
+                        questionsState = JSON.parse(questionsStateJSON);
+                    }
+                    loadQuestions(questions);
+                } catch (error) {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Erreur',
+                        text: 'Erreur lors du chargement des questions. Veuillez vérifier le format du fichier JSON.'
+                    });
+                }
+            }
+
+            // Charger le thème à partir du stockage local
+            if (localStorage.getItem('theme') === 'dark') {
+                document.body.classList.add('dark-mode');
+                document.getElementById('themeToggle').checked = true;
+            }
+        });
+
+        // Ajouter un écouteur d'événement pour avertir lors de l'actualisation de la page
+        window.addEventListener('beforeunload', function (e) {
+            if (qcmStarted) {
+                e.preventDefault();
+                e.returnValue = '';
+            }
+        });
+
+        // Fonction pour basculer l'option de mélange des questions
+        function toggleShuffle() {
+            shuffleQuestions = !shuffleQuestions;
+            const shuffleButton = document.getElementById('shuffleButton');
+            shuffleButton.classList.toggle('active', shuffleQuestions);
+            reloadQuestions();
+        }
+
+        // Fonction pour recharger les questions
+        function reloadQuestions() {
+            const questionsJSON = localStorage.getItem('qcmQuestions');
+            if (questionsJSON) {
+                try {
+                    const questions = JSON.parse(questionsJSON);
+                    loadQuestions(questions);
+                } catch (error) {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Erreur',
+                        text: 'Erreur lors du rechargement des questions. Veuillez vérifier le format du fichier JSON.'
+                    });
+                }
+            }
+        }
+
+        // Fonction pour aller à la page de création du QCM
+        function goToJsonCreatorPage() {
+            window.location.href = 'json_creator_page/json_creator_page.html'; // Remplacez par le lien correct de la page de création JSON
+        }
+
+        // Fonction pour charger dynamiquement les questions dans le formulaire
+        function loadQuestions(questions) {
+            const form = document.getElementById('qcmForm');
+            form.innerHTML = ""; // Clear existing form contents
+
+            if (shuffleQuestions) {
+                questions = questions.sort(() => Math.random() - 0.5);
+            }
+
+            questions.forEach((q, index) => {
+                const questionDiv = document.createElement('div');
+                questionDiv.classList.add('question');
+                questionDiv.id = `question${index}`;
+                questionDiv.setAttribute('data-answered', 'false'); // Ajouter l'attribut pour le suivi des réponses
+
+                const questionText = document.createElement('p');
+                questionText.id = `questionText${index}`;
+                questionText.innerText = `${index + 1}. ${q.question}`;
+                questionDiv.appendChild(questionText);
+
+                q.options.forEach((option, optIndex) => {
+                    const optionLabel = document.createElement('label');
+                    const input = document.createElement('input');
+                    input.type = q.type === 'multiple' ? 'checkbox' : 'radio';
+                    input.name = `q${index}`;
+                    input.value = String.fromCharCode(65 + optIndex);
+
+                    // Restaurer l'état des réponses si elles existent
+                    if (questionsState[index] && questionsState[index].includes(input.value)) {
+                        input.checked = true;
+                        questionDiv.setAttribute('data-answered', 'true');
+                    }
+
+                    // Ajouter un événement de changement qui met à jour l'attribut `data-answered`
+                    input.addEventListener('change', () => {
+                        questionDiv.setAttribute('data-answered', 'true');
+                        qcmStarted = true; // Marquer que le QCM a commencé
+                        saveState(); // Sauvegarder l'état après chaque changement
+                        updateProgressBar();
+                    });
+
+                    optionLabel.appendChild(input);
+                    optionLabel.appendChild(document.createTextNode(` ${String.fromCharCode(65 + optIndex)}) ${option}`));
+                    questionDiv.appendChild(optionLabel);
+                    questionDiv.appendChild(document.createElement('br'));
+                });
+
+                // Ajouter un élément pour afficher la correction après la soumission
+                const correctionText = document.createElement('p');
+                correctionText.id = `correction${index}`;
+                questionDiv.appendChild(correctionText);
+
+                form.appendChild(questionDiv);
+                form.appendChild(document.createElement('br'));
+            });
+
+            const submitButton = document.createElement('button');
+            submitButton.type = 'button';
+            submitButton.innerText = 'Soumettre';
+            submitButton.onclick = function () {
+                corrigerQCM(questions);
+                updateProgressBar(); // Mise à jour de la progression après correction
+                if (document.getElementById('lockAnswers').checked) {
+                    lockAllAnswers();
+                }
+                clearState(); // Effacer l'état après soumission
+            };
+            form.appendChild(submitButton);
+
+            resetProgressBar(); // Réinitialiser la barre de progression
+        }
+
+        // Fonction pour verrouiller toutes les réponses après soumission
+        function lockAllAnswers() {
+            const inputs = document.querySelectorAll('#qcmForm input[type="radio"], #qcmForm input[type="checkbox"]');
+            inputs.forEach(input => {
+                input.disabled = true;
+            });
+        }
+
+        // Fonction pour importer des questions depuis un fichier JSON
+        function importQuestions() {
+            const file = document.getElementById('fileInput').files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function (e) {
+                    try {
+                        const questions = JSON.parse(e.target.result);
+                        if (!validateQuestions(questions)) {
+                            throw new Error("Format du fichier JSON invalide. Veuillez inclure des questions valides avec les options et les bonnes réponses.");
+                        }
+                        localStorage.setItem('qcmQuestions', e.target.result);
+                        loadQuestions(questions);
+                        // Réinitialiser la barre de progression après l'importation
+                        resetProgressBar();
+                        clearState(); // Effacer l'état précédent
+                    } catch (error) {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Erreur',
+                            text: 'Erreur lors du chargement du fichier JSON. Veuillez vérifier le format du fichier.'
+                        });
+                    }
+                };
+                reader.readAsText(file);
+            }
+        }
+
+        // Fonction pour valider la structure du fichier JSON
+        function validateQuestions(questions) {
+            if (!Array.isArray(questions)) return false;
+            for (let question of questions) {
+                if (typeof question.question !== 'string' || !Array.isArray(question.options) || question.options.length < 2) {
+                    return false;
+                }
+                if (!question.correct || (!Array.isArray(question.correct) && typeof question.correct !== 'string')) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        // Fonction pour corriger le QCM
+        function corrigerQCM(questions) {
+            let score = 0;
+            const correctionType = document.getElementById('correctionType').value;
+
+            // Réinitialiser les styles des questions et des corrections précédentes
+            questions.forEach((q, index) => {
+                const questionDiv = document.getElementById(`question${index}`);
+                const questionText = document.getElementById(`questionText${index}`);
+                const correctionElement = document.getElementById(`correction${index}`);
+
+                // Supprimer toutes les classes précédentes
+                questionDiv.classList.remove('correct', 'incorrect');
+                questionText.classList.remove('correct-answer', 'incorrect-answer');
+                correctionElement.classList.remove('incorrect-answer');
+                correctionElement.innerHTML = "";
+                questionText.style.color = ""; // Réinitialiser la couleur du texte
+            });
+
+            // Vérifier les réponses et calculer le score
+            questions.forEach((q, index) => {
+                const selectedOptions = Array.from(document.querySelectorAll(`input[name="q${index}"]:checked`));
+                const correctAnswers = Array.isArray(q.correct) ? q.correct : [q.correct];
+                const correctionElement = document.getElementById(`correction${index}`);
+                const questionDiv = document.getElementById(`question${index}`);
+                const questionText = document.getElementById(`questionText${index}`);
+
+                let allCorrect = true;
+                const selectedValues = selectedOptions.map(option => option.value);
+                allCorrect = correctAnswers.every(answer => selectedValues.includes(answer)) && correctAnswers.length === selectedValues.length;
+
+                if (allCorrect) {
+                    score++;
+                    correctionElement.innerHTML = `Bonne réponse : <span class="correct-answer">${correctAnswers.join(', ')}</span>`;
+                    if (correctionType === 'highlight') {
+                        questionDiv.classList.add('correct');
+                        if (document.body.classList.contains('dark-mode')) {
+                            questionText.style.color = '#90ee90';
+                        }
+                    } else if (correctionType === 'color') {
+                        questionText.classList.add('correct-answer');
+                    }
+                } else {
+                    correctionElement.innerHTML = `Mauvaise réponse. La bonne réponse était : <span class="correct-answer">${correctAnswers.join(', ')}</span>`;
+                    correctionElement.classList.add('incorrect-answer');
+                    if (correctionType === 'highlight') {
+                        questionDiv.classList.add('incorrect');
+                    } else if (correctionType === 'color') {
+                        questionText.classList.add('incorrect-answer');
+                    }
+                }
+            });
+
+            // Afficher le score total
+            const scoreContainer = document.getElementById('scoreText');
+            scoreContainer.innerText = `Votre score : ${score} sur ${questions.length}`;
+
+            // Calculer et afficher la note sur 20
+            const note = (score / questions.length) * 20;
+            const noteContainer = document.getElementById('noteText');
+            noteContainer.innerText = `Note : ${note.toFixed(2)} / 20`;
+        }
+
+        // Sauvegarder l'état des réponses
+        function saveState() {
+            const questionsState = [];
+            const questions = document.querySelectorAll('.question');
+            questions.forEach((questionDiv, index) => {
+                const selectedOptions = Array.from(questionDiv.querySelectorAll(`input[name="q${index}"]:checked`));
+                const selectedValues = selectedOptions.map(option => option.value);
+                questionsState.push(selectedValues);
+            });
+            localStorage.setItem('qcmQuestionsState', JSON.stringify(questionsState));
+        }
+
+        // Effacer l'état des réponses
+        function clearState() {
+            localStorage.removeItem('qcmQuestionsState');
+        }
+
+        // Mettre à jour la barre de progression
+        function updateProgressBar() {
+            const totalQuestions = document.querySelectorAll('.question').length;
+            const answeredQuestions = document.querySelectorAll('.question[data-answered="true"]').length;
+            const progress = (answeredQuestions / totalQuestions) * 100;
+            const progressBar = document.getElementById('progressBar');
+            progressBar.style.width = `${progress}%`;
+            progressBar.innerText = `${Math.round(progress)}%`;
+        }
+
+        // Réinitialiser la barre de progression
+        function resetProgressBar() {
+            const progressBar = document.getElementById('progressBar');
+            progressBar.style.width = `0%`;
+            progressBar.innerText = `0%`;
+        }
+
+        // Fonction pour basculer entre le thème clair et sombre
+        function toggleTheme() {
+            const isDarkMode = document.body.classList.toggle('dark-mode');
+            localStorage.setItem('theme', isDarkMode ? 'dark' : 'light');
+        }
+
+    </script>
+</body>
+</html>
