@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <title>Créateur de Fichier JSON pour QCM</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+            color: #333;
+            padding-top: 20px;
+            /* transition: background-color 0.5s, color 0.5s; */
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            color: #4CAF50;
+        }
+
+        form {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            /*    transition: background-color 0.5s, color 0.5s;*/
+            max-width: 600px;
+            margin: auto;
+        }
+
+        label {
+            font-weight: bold;
+            color: #333;
+            display: block;
+            margin: 10px 0 5px;
+        }
+
+        input[type="text"],
+        textarea {
+            width: calc(100% - 20px);
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+            margin-bottom: 15px;
+        }
+
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        .question-container {
+            margin-bottom: 20px;
+            border: 1px solid #ccc;
+            padding: 10px;
+            border-radius: 5px;
+        }
+
+        .remove-question-button {
+            background-color: #e74c3c;
+            color: white;
+            padding: 5px 10px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .remove-question-button:hover {
+            background-color: #c0392b;
+        }
+
+        .dark-mode {
+            background-color: #333;
+            color: #f5f5f5;
+        }
+
+        .dark-mode form {
+            background-color: #444;
+            color: #f5f5f5;
+        }
+
+        .dark-mode button {
+            background-color: #555;
+        }
+
+        .dark-mode button:hover {
+            background-color: #666;
+        }
+
+        .dark-mode h1 {
+            color: #90ee90;
+        }
+
+        .dark-mode label {
+            color: #f5f5f5;
+        }
+
+        .dark-mode .remove-question-button {
+            background-color: #e74c3c;
+            color: white;
+        }
+
+        .dark-mode .remove-question-button:hover {
+            background-color: #c0392b;
+        }
+
+        #jsonOutput {
+            margin-top: 30px;
+        }
+        #questionsContainer {
+            margin-top: 20px;
+            text-align: left;
+            margin-left: auto;
+            margin-right: auto;
+            width: 60%;
+        }
+        #previewContainer {
+            margin-top: 30px;
+            text-align: left;
+            margin-left: auto;
+            margin-right: auto;
+            width: 60%;
+           /* background-color: #fafafa;*/
+            padding: 10px;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <h1>Créateur de Fichier JSON pour QCM</h1>
+        <label for="themeToggle">Mode sombre :
+            <input type="checkbox" id="themeToggle" onchange="toggleTheme()">
+            <br></br>
+            <input type="file" id="jsonImportInput" accept=".json" onchange="importJson()">
+        </label>
+    </header>
+    <form id="jsonCreatorForm">
+        <div id="questionsContainer">
+            <!-- Les questions seront ajoutées ici dynamiquement -->
+        </div>
+        <button type="button" onclick="addQuestion()">Ajouter une question</button>
+        <br><br>
+        <button type="button" onclick="generateJSON()">Générer le fichier JSON</button>
+
+    </form>
+    <label for="fileName">Nom du fichier JSON :</label>
+    <input type="text" id="fileName" placeholder="qcm_questions.json">
+    <textarea id="jsonOutput" class="jsonOutput" rows="10"
+        placeholder="Le fichier JSON généré apparaîtra ici..."></textarea>
+    <div id="previewContainer">
+        <h3>Prévisualisation des Questions :</h3>
+    </div>
+    <br><br>
+    <button onclick="downloadJSON()">Télécharger le fichier JSON</button>
+    <br><br>
+    <button onclick="goToQcmPage()">Revenir à la page du QCM</button>
+
+    <script>
+        let questionCount = 0;
+
+        // Fonction pour ajouter une nouvelle question
+        function addQuestion(question = null) {
+            questionCount++;  // ID unique pour chaque question
+
+            const questionsContainer = document.getElementById('questionsContainer');
+            const currentQuestionNumber = questionsContainer.children.length + 1;
+
+            const questionDiv = document.createElement('div');
+            questionDiv.classList.add('question-container');
+            questionDiv.id = `question${questionCount}`;
+
+            questionDiv.innerHTML = `
+                <label for="questionText${questionCount}">Question ${currentQuestionNumber} :</label>
+                <input type="text" id="questionText${questionCount}" placeholder="Entrez la question">
+                <label for="questionType${questionCount}">Type de question :</label>
+                <select id="questionType${questionCount}" onchange="updateOptionsType(${questionCount})">
+                    <option value="single">Choix unique</option>
+                    <option value="multiple">Choix multiple</option>
+                </select>
+                <label>Options :</label>
+                <div id="optionsContainer${questionCount}">
+                </div>
+                <button type="button" onclick="addOption(${questionCount})">Ajouter une option</button>
+                <br><br>
+                <button type="button" class="remove-question-button" onclick="removeQuestion(${questionCount})">Supprimer cette question</button>
+            `;
+            questionsContainer.appendChild(questionDiv);
+
+            // Si une question est fournie, remplir les champs
+            if (question) {
+                document.getElementById(`questionText${questionCount}`).value = question.question;
+                document.getElementById(`questionType${questionCount}`).value = question.type;
+                question.options.forEach((option, index) => {
+                    addOption(questionCount, option, question.correct.includes(String.fromCharCode(65 + index)));
+                });
+            }
+
+            updatePreview();
+            saveToLocalStorage();
+        }
+
+        // Fonction pour ajouter une nouvelle option à une question
+        function addOption(questionId, optionText = '', isCorrect = false) {
+            const optionsContainer = document.getElementById(`optionsContainer${questionId}`);
+            const optionCount = optionsContainer.children.length;
+            const optionDiv = document.createElement('div');
+
+            // Détermine si la question est à choix unique ou multiple
+            const questionType = document.getElementById(`questionType${questionId}`).value;
+            const inputType = questionType === 'multiple' ? 'checkbox' : 'radio';
+
+            optionDiv.innerHTML = `
+                <input type="text" placeholder="Option ${String.fromCharCode(65 + optionCount)}" value="${optionText}">
+                <input type="${inputType}" name="correct${questionId}" id="correct${questionId}${String.fromCharCode(65 + optionCount)}" ${isCorrect ? 'checked' : ''}> Correct
+            `;
+
+            optionsContainer.appendChild(optionDiv);
+            updatePreview();
+            saveToLocalStorage();
+        }
+
+        // Fonction pour supprimer une question
+        function removeQuestion(questionId) {
+            const questionDiv = document.getElementById(`question${questionId}`);
+            questionDiv.remove();
+
+            // Mettre à jour les numéros de question affichés
+            const questions = document.querySelectorAll('.question-container');
+            questions.forEach((q, index) => {
+                const label = q.querySelector('label[for^="questionText"]');
+                if (label) {
+                    label.textContent = `Question ${index + 1} :`;
+                }
+            });
+
+            updatePreview();
+            saveToLocalStorage();
+        }
+
+        // Fonction pour mettre à jour le type des options lorsqu'on change le type de la question
+        function updateOptionsType(questionId) {
+            const questionType = document.getElementById(`questionType${questionId}`).value;
+            const optionsContainer = document.getElementById(`optionsContainer${questionId}`);
+            const inputType = questionType === 'multiple' ? 'checkbox' : 'radio';
+
+            // Met à jour tous les types des inputs existants dans les options
+            Array.from(optionsContainer.children).forEach((optionDiv) => {
+                const correctInput = optionDiv.querySelector('input[type="radio"], input[type="checkbox"]');
+                correctInput.type = inputType;
+                correctInput.name = `correct${questionId}`; // Assure que seul un radio peut être sélectionné pour "Choix unique"
+            });
+
+            updatePreview();
+            saveToLocalStorage();
+        }
+
+        // Fonction pour générer le fichier JSON à partir des questions, avec validation
+        function validateBeforeGenerate() {
+            const questionsContainer = document.getElementById('questionsContainer');
+            const questionDivs = questionsContainer.querySelectorAll('.question-container');
+            let isValid = true;
+
+            questionDivs.forEach((div) => {
+                const questionText = div.querySelector('input[type="text"]').value.trim();
+                const options = div.querySelectorAll('input[type="text"]');
+                if (!questionText || options.length < 2) {
+                    isValid = false;
+                }
+            });
+
+            if (!isValid) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Erreur de validation',
+                    text: 'Chaque question doit avoir un texte et au moins deux options.'
+                });
+            } else {
+                generateJSON();
+            }
+        }
+
+        // Fonction pour générer le fichier JSON
+        function generateJSON() {
+            const questions = [];
+            const questionsContainer = document.getElementById('questionsContainer');
+            const questionDivs = questionsContainer.querySelectorAll('.question-container');
+
+            questionDivs.forEach((div) => {
+                const questionText = div.querySelector('input[type="text"]').value;
+                const questionType = div.querySelector('select').value;
+                const optionsDiv = div.querySelector(`#optionsContainer${div.id.replace('question', '')}`);
+                const options = [];
+                const correctAnswers = [];
+
+                Array.from(optionsDiv.children).forEach((optionDiv, index) => {
+                    const optionText = optionDiv.querySelector('input[type="text"]').value;
+                    const isCorrect = optionDiv.querySelector('input[type="radio"], input[type="checkbox"]').checked;
+                    options.push(optionText);
+                    if (isCorrect) {
+                        correctAnswers.push(String.fromCharCode(65 + index));
+                    }
+                });
+
+                questions.push({
+                    question: questionText,
+                    type: questionType,
+                    options: options,
+                    correct: correctAnswers
+                });
+            });
+
+            document.getElementById('jsonOutput').value = JSON.stringify(questions, null, 2);
+            saveToLocalStorage();
+        }
+
+        // Fonction pour importer des questions depuis un fichier JSON
+        function importJson() {
+            const fileInput = document.getElementById('jsonImportInput');
+            const file = fileInput.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function (e) {
+                    try {
+                        const questions = JSON.parse(e.target.result);
+
+                        // Vérifiez que chaque question a bien toutes ses propriétés
+                        if (!Array.isArray(questions) || questions.some(q => !q.question || !q.options)) {
+                            throw new Error('Format incorrect');
+                        }
+
+                        document.getElementById('questionsContainer').innerHTML = "";
+                        questionCount = 0;
+
+                        questions.forEach((question) => {
+                            addQuestion(question);
+                        });
+
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Importation réussie',
+                            text: 'Les questions ont été importées avec succès.'
+                        });
+                    } catch (error) {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Erreur',
+                            text: 'Le format du fichier JSON est incorrect. Veuillez vérifier le fichier.'
+                        });
+                    }
+                };
+                reader.readAsText(file);
+            }
+        }
+
+        // Fonction pour télécharger le fichier JSON
+        function downloadJSON() {
+            const dataStr = document.getElementById('jsonOutput').value;
+            const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
+
+            const fileName = document.getElementById('fileNameInput').value || 'qcm.json';
+
+            let linkElement = document.createElement('a');
+            linkElement.setAttribute('href', dataUri);
+            linkElement.setAttribute('download', fileName);
+            linkElement.click();
+        }
+
+        // Fonction pour basculer entre le thème clair et sombre
+        function toggleTheme() {
+            const isDarkMode = document.body.classList.toggle('dark-mode');
+            localStorage.setItem('theme', isDarkMode ? 'dark' : 'light');
+        }
+
+        // Fonction pour sauvegarder l'état actuel des questions dans le localStorage
+        function saveToLocalStorage() {
+            const questionsJSON = document.getElementById('jsonOutput').value;
+            localStorage.setItem('qcmQuestions', questionsJSON);
+        }
+
+        // Charger les questions sauvegardées depuis le localStorage au démarrage
+        document.addEventListener('DOMContentLoaded', function () {
+            if (localStorage.getItem('theme') === 'dark') {
+                document.body.classList.add('dark-mode');
+                document.getElementById('themeToggle').checked = true;
+            }
+
+            const savedQuestions = localStorage.getItem('qcmQuestions');
+            if (savedQuestions) {
+                try {
+                    const questions = JSON.parse(savedQuestions);
+                    questions.forEach(question => addQuestion(question));
+                } catch (error) {
+                    console.error('Erreur de chargement des questions sauvegardées:', error);
+                }
+            }
+        });
+
+        // Fonction pour mettre à jour la prévisualisation en temps réel
+        function updatePreview() {
+            const previewContainer = document.getElementById('previewContainer');
+            previewContainer.innerHTML = '<h3>Prévisualisation des Questions :</h3>'; // Efface l'aperçu existant
+
+            const questionsContainer = document.getElementById('questionsContainer');
+            const questionDivs = questionsContainer.querySelectorAll('.question-container');
+
+            questionDivs.forEach((div, index) => {
+                const questionText = div.querySelector('input[type="text"]').value;
+                const previewQuestion = document.createElement('p');
+                previewQuestion.textContent = `${index + 1}. ${questionText}`;
+                previewContainer.appendChild(previewQuestion);
+            });
+        }
+    </script>
+</body>
+
+</html>
